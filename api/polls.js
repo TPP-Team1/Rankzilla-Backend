@@ -210,6 +210,64 @@ router.patch("/:pollId", authenticateJWT, async (req, res) => {
 
 });
 
+// update poll - put endpoint
+router.put("/:id", authenticateJWT, async (req, res) => {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { title, description, deadline, status, options = [], authRequired, restricted, allowSharedLinks } = req.body;
+
+    try {
+        const poll = await Poll.findByPk(id);
+
+        if (!poll) {
+            return res.status(404).json({ error: "poll not found" });
+        }
+        
+        if (poll.userId !== userId) {
+            return res.status(403).json({ error: "unauthorized - not your poll" });
+        }
+
+        // update poll data
+        const updatedPoll = await poll.update({
+            title,
+            description,
+            deadline,
+            status,
+            authRequired,
+            restricted,
+            // allowSharedLinks not in model, skip for now
+        });
+
+        // handle options update if provided
+        if (options.length > 0) {
+            // remove existing options
+            await PollOption.destroy({ where: { pollId: id } });
+            
+            // create new options
+            const formattedOptions = options.map(text => ({
+                optionText: text,
+                pollId: id
+            }));
+            
+            await PollOption.bulkCreate(formattedOptions);
+        }
+
+        // fetch updated poll with options
+        const pollWithOptions = await Poll.findByPk(id, {
+            include: { model: PollOption }
+        });
+
+        res.json({
+            success: true,
+            poll: pollWithOptions
+        });
+
+    } catch (error) {
+        console.error("put update error:", error);
+        res.status(500).json({ error: "failed to update poll" });
+    }
+});
+
 //delete draft poll-------------------------
 router.delete("/:id", authenticateJWT, async (req, res) => {
     try {
