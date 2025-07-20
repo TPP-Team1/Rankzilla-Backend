@@ -234,5 +234,30 @@ router.delete("/:id", authenticateJWT, async (req, res) => {
     }
 });
 
+// Track poll access by user (only once)
+router.post("/:slug/track", authenticateJWT, async (req, res) => {
+    const userId = req.user.id;
+    const slug = req.params.slug;
+
+    try {
+        const poll = await Poll.findOne({ where: { slug } });
+        if (!poll) return res.status(404).json({ error: "Poll not found" });
+
+        const isOwner = poll.userId === userId;
+
+        const alreadySeen = await PollAccess.findOne({
+            where: { userId, pollId: poll.id }
+        });
+
+        if (!isOwner && !alreadySeen) {
+            await PollAccess.create({ userId, pollId: poll.id });
+        }
+
+        res.sendStatus(204); // success with no content
+    } catch (error) {
+        console.error("Track access error:", error);
+        res.status(500).json({ error: "Failed to track poll access" });
+    }
+});
 
 module.exports = router;
