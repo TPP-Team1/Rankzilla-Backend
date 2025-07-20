@@ -5,6 +5,7 @@ const PollOption = require("./models/pollOption");
 const VotingRank = require("./models/votingRank");
 const Vote = require("./models/vote");
 const RestrictedPollAccess = require('./models/restrictedPollAccess')
+const PollAccess = require('./models/pollAccess');
 
 //----- User Model--------
 
@@ -96,7 +97,21 @@ Poll.belongsToMany(User, {
   foreignKey: "pollId",
 })
 
-// 
+//----- Poll Access Model-------- 
+
+// A user can view many polls
+User.belongsToMany(Poll, {
+  through: PollAccess,
+  as: "seenPolls",
+  foreignKey: "userId",
+});
+
+// A poll can be viewed by many users
+Poll.belongsToMany(User, {
+  through: PollAccess,
+  as: "viewedByUsers",
+  foreignKey: "pollId",
+});
 
 
 
@@ -108,4 +123,5 @@ module.exports = {
   Vote,
   VotingRank,
   RestrictedPollAccess,
+  PollAccess,
 };
