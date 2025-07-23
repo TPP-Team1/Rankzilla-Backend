@@ -303,6 +303,7 @@ router.post("/:pollId/vote", authenticateJWT, async (req, res) => {
     // console.log(completedVote.votingRanks)
     for (const votingRank of completedVote.votingRanks) {
       votingRank.pollOption.position = votingRank.rank - 1;
+      await votingRank.pollOption.save(); // add position change to DB
     }
     return res.send(completedVote);
 
