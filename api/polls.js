@@ -334,7 +334,7 @@ router.post("/:pollId/vote", authenticateJWT, blockIfDisabled, async (req, res) 
 });
 
 //--------------------------------------------------------------------------------
-router.patch("/poll/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
+router.patch("/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
   const userId = req.user.id;
   const { voteId, pollId } = req.params;
   const { submitted, rankings } = req.body;
@@ -823,9 +823,7 @@ router.get("/:pollId/results", authenticateJWT, blockIfDisabled, async (req, res
 })
 
 // admin route to fetch all polls
-
-router.get("/admin/all", authenticateJWT, isAdmin, async (req, res) => {
-
+router.get("/all/all", authenticateJWT, isAdmin, async (req, res) => {
   try {
     const polls = await Poll.findAll({
       include: [{ model: PollOption }],
