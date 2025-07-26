@@ -10,7 +10,41 @@ router.get("/", authenticateJWT, async (req, res) => {
 
   try {
     const userPolls = await Poll.findAll({ where: { userId } });
-    res.json(userPolls);
+
+    //polls user voted on
+    const votedPolls = await Poll.findAll({
+      include: {
+        model: Vote,
+        where: { userId },
+        attributes: [],
+      },
+    });
+
+    // Combine both results
+    const pollMap = new Map();
+
+    userPolls.forEach(poll => {
+      pollMap.set(poll.id, {
+        ...poll.toJSON(),
+        ownerId: userId,
+        participated: false,
+      });
+    });
+
+    votedPolls.forEach(poll => {
+        if (!pollMap.has(poll.id)) {
+          pollMap.set(poll.id, {
+            ...poll.toJSON(),
+            ownerId: poll.userId,
+            participated: true,
+          });
+        }
+    });
+
+    // Convert map back to array
+    const allPolls = Array.from(pollMap.values());
+
+    res.json(allPolls);
   } catch (error) {
     res.status(500).json({ error: "Failed to get all polls" });
   }
@@ -354,10 +388,8 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
   }
 });
 
-
-
-//---------------------------------------Update drafted Vote-----------------------------------------
-router.patch("/poll/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
+//--------------------------------------------------------------------------------
+router.patch("/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
   const userId = req.user.id;
   const { voteId, pollId } = req.params;
   const { submitted, rankings } = req.body;
