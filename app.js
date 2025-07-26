@@ -25,6 +25,10 @@ const allowedOrigins = [
   'https://rankzilla-frontend.vercel.app'
 ];
 
+
+const vercelPreviewPattern = /^https:\/\/rankzilla-frontend-[a-z0-9-]+\.vercel\.app$/;
+
+
 app.use(
   cors({
     origin: function (origin, callback) {

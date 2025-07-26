@@ -7,6 +7,17 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
+const optionalAuth = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) return next(); // No token = guest
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return next(); // Invalid token = still guest
+    req.user = user;
+    next();
+  });
+};
+
 // Middleware to authenticate JWT tokens
 const authenticateJWT = (req, res, next) => {
   const token = req.cookies.token;
@@ -100,7 +111,7 @@ router.post("/auth0", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
@@ -119,7 +130,7 @@ router.post("/auth0", async (req, res) => {
   }
 });
 
-// Signup route
+// Signup route--------------------------------------------
 router.post("/signup", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -162,7 +173,7 @@ router.post("/signup", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
@@ -176,7 +187,7 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Login route
+// Login route-------------------------------------------------------
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -225,7 +236,7 @@ router.post("/login", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
@@ -239,13 +250,13 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Logout route
+// Logout route-----------------------------------------------------
 router.post("/logout", (req, res) => {
   res.clearCookie("token");
   res.send({ message: "Logout successful" });
 });
 
-// Get current user route (protected)
+// Get current user route (protected)------------------------------
 router.get("/me", authenticateJWT, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
@@ -277,7 +288,7 @@ const looksLikeEmail = (input) => {
   return input.includes("@");
 };
 
-// Signup with username and password
+// Signup with username and password------------------------------
 router.post("/signup/username", async (req, res) => {
   try {
     const { username, password, firstName, lastName } = req.body;
@@ -326,7 +337,7 @@ router.post("/signup/username", async (req, res) => {
 
     const user = await User.create(userData);
 
-    // Generate JWT token
+    // Generate JWT token---------------------------------------
     const token = jwt.sign(
       {
         id: user.id,
@@ -341,7 +352,7 @@ router.post("/signup/username", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
@@ -359,7 +370,7 @@ router.post("/signup/username", async (req, res) => {
     res.status(500).send({ error: "Internal server error" });
   }
 });
-
+//-----------------------------------------------------------------------------------
 // Helper function to validate email format
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -409,7 +420,7 @@ router.post("/signup/email", async (req, res) => {
 
     const user = await User.create(userData);
 
-    // Generate JWT token
+    // Generate JWT token---------------------------------------------------------
     const token = jwt.sign(
       {
         id: user.id,
@@ -424,7 +435,7 @@ router.post("/signup/email", async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
@@ -442,10 +453,11 @@ router.post("/signup/email", async (req, res) => {
     res.status(500).send({ error: "Internal server error" });
   }
 });
-
+//---------------------------------------------------------------------------------
 module.exports = {
   router,
   authenticateJWT,
   isAdmin,
   blockIfDisabled,
+  optionalAuth
 };
