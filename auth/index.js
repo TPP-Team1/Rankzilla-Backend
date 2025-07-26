@@ -9,11 +9,16 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 const optionalAuth = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return next(); // No token = guest
+  console.log("Token from cookies:", token);
+  if (!token) return next();
+  console.log("Cookies:", req.cookies);
+  console.log("Token:", req.cookies?.token);
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return next(); // Invalid token = still guest
-    req.user = user;
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (!err) {
+      req.user = user;
+      console.log("Authenticated user:", user);
+    }
     next();
   });
 };

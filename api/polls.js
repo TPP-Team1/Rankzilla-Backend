@@ -114,8 +114,7 @@ router.get("/slug/:slug", async (req, res) => {
 router.get("/:pollId", authenticateJWT, async (req, res) => {
   const userId = req.user.id;
   const { pollId } = req.params;
-  console.log(pollId);
-  console.log(userId);
+  console.log("Fetching poll with ID:", pollId);
 
   try {
     // fetch a spcific poll with options that belong to this user
@@ -286,7 +285,7 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
   // ];
   // console.log("Vote route hit");
   const userId = req.user?.id || null; // null = guest  
-
+  console.log("req.user:", req.user);
 
   const { pollId } = req.params;
   // console.log("Poll Id", pollId)
@@ -306,6 +305,10 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
     if (!poll) {
       return res.status(404).json({ error: "Poll not found" });
     }
+
+    ////  validation for poll ended status---------------------------------------
+    /////     here
+
 
 
     // I want to create a new vote only if a vote does not already exist
