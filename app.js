@@ -32,7 +32,11 @@ const vercelPreviewPattern = /^https:\/\/rankzilla-frontend-[a-z0-9-]+\.vercel\.
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        vercelPreviewPattern.test(origin)
+      ) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

@@ -258,6 +258,7 @@ router.post("/logout", (req, res) => {
 
 // Get current user route (protected)------------------------------
 router.get("/me", authenticateJWT, async (req, res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   try {
     const user = await User.findByPk(req.user.id, {
       attributes: [
@@ -276,7 +277,7 @@ router.get("/me", authenticateJWT, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    res.json(user);
+    res.json({ user });
   } catch (error) {
     console.error("error fetching user info:", error);
     res.status(500).json({ error: "fail to fetch user info" });
