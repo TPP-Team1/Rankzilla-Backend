@@ -419,7 +419,6 @@ router.patch("/poll/:pollId/vote/:voteId", authenticateJWT, async (req, res) => 
   }
 });
 
-
 // get the current user's submission for a poll-----------------------------
 router.get("/:pollId/vote", authenticateJWT, async (req, res) => {
   const userId = req.user.id;
@@ -973,6 +972,41 @@ router.patch('/:pollId/disable', authenticateJWT, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error disabling poll:', error);
     res.status(500).json({ error: 'Failed to disable poll' });
+  }
+});
+
+// GET /api/polls/participated - Polls where current user has voted
+router.get("/participated", authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Find all votes by this user
+    const votes = await Vote.findAll({ where: { userId } });
+    const pollIds = votes.map(v => v.pollId);
+    if (pollIds.length === 0) {
+      return res.json({ message: "No participated polls.", polls: [] });
+    }
+    // find all polls where user has voted
+    const polls = await Poll.findAll({ where: { id: pollIds } });
+    // label as participated
+    const labeled = polls.map(p => ({ ...p.toJSON(), participated: true }));
+    res.json({ message: "Participated polls retrieved.", polls: labeled });
+  } catch (error) {
+    console.error("Error fetching participated polls:", error);
+    res.status(500).json({ error: "Failed to get participated polls" });
+  }
+});
+
+// GET /api/polls/created - Polls created by current user
+router.get("/created", authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const polls = await Poll.findAll({ where: { userId } });
+    // label as `created`
+    const labeled = polls.map(p => ({ ...p.toJSON(), created: true }));
+    res.json({ message: "Created polls retrieved.", polls: labeled });
+  } catch (error) {
+    console.error("Error fetching created polls:", error);
+    res.status(500).json({ error: "Failed to get created polls" });
   }
 });
 
