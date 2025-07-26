@@ -13,6 +13,7 @@ const { db } = require("./database");
 const cors = require("cors");
 const oAuthRouter = require("./auth/routes")
 const usersRouter = require("./api/users")
+const emailRouter = require("./api/email");
 
 const PORT = process.env.PORT || 8080;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -68,6 +69,9 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.sendStatus(500);
 });
+
+// email router
+app.use("/api/email", emailRouter); // mount email router
 
 const runApp = async () => {
   try {
