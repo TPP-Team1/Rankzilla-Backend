@@ -2,7 +2,7 @@ require("dotenv").config();
 const nodemailer = require("nodemailer");
 
 
-const sendMail = async (to) => {
+const sendMail = async (recipients, resultMessage) => {
     try{
         const transporter = nodemailer.createTransport({
             service: "gmail",
@@ -14,9 +14,10 @@ const sendMail = async (to) => {
 
         const mailResults = {
             from: `Rankzilla <${process.env.EMAIL_USER}>`, // sender address
-            to,
+            to: recipients,
             subject: "Poll Results Are Out!",
-            text: "Here are the results of the poll you voted on!",
+            text: `Thank you for participating in the poll!\n\n${resultMessage}`,
+            html: `<p>Thank you for participating in the poll!</p><p><strong>${resultMessage}</strong></p>`
         };
 
         const info = await transporter.sendMail(mailResults);
