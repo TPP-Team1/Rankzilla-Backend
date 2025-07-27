@@ -11,7 +11,7 @@ const seed = async () => {
       {
         username: "Tran",
         passwordHash: User.hashPassword("tran123"),
-        email: "tran@example.com",
+        email: "vobaohoangtran@gmail.com",
         firstName: "Tran",
         lastName: "Vo",
         img: "https://cdn2.thecatapi.com/images/MTY3ODIyMQ.jpg",
@@ -21,7 +21,7 @@ const seed = async () => {
       {
         username: "Flo",
         passwordHash: User.hashPassword("flo123"),
-        email: "flo@example.com",
+        email: "rend10286@gmail.com",
         firstName: "Florencio",
         lastName: "Rendon",
         img: "https://cdn2.thecatapi.com/images/MTY3ODIyMg.jpg",
@@ -31,7 +31,7 @@ const seed = async () => {
       {
         username: "Olivia",
         passwordHash: User.hashPassword("olivia123"),
-        email: "olivia@example.com",
+        email: "heavenwilson210@gmail.com",
         firstName: "Olivia",
         lastName: "Wilson-Simmonds",
         img: "https://cdn2.thecatapi.com/images/MTY3ODIyMw.jpg",
@@ -41,7 +41,7 @@ const seed = async () => {
       {
         username: "Hai",
         passwordHash: User.hashPassword("hai123"),
-        email: "hai@example.com",
+        email: "hailia.sommerville@gmail.com",
         firstName: "Hailia",
         lastName: "Sommerville",
         img: "https://cdn2.thecatapi.com/images/MTY3ODIyNA.jpg",
