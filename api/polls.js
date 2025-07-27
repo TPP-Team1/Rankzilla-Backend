@@ -32,13 +32,13 @@ router.get("/", authenticateJWT, async (req, res) => {
     });
 
     votedPolls.forEach(poll => {
-        if (!pollMap.has(poll.id)) {
-          pollMap.set(poll.id, {
-            ...poll.toJSON(),
-            ownerId: poll.userId,
-            participated: true,
-          });
-        }
+      if (!pollMap.has(poll.id)) {
+        pollMap.set(poll.id, {
+          ...poll.toJSON(),
+          ownerId: poll.userId,
+          participated: true,
+        });
+      }
     });
 
     // Convert map back to array
@@ -143,7 +143,15 @@ router.get("/:pollId", authenticateJWT, async (req, res) => {
 // Create polls---------------------------
 router.post("/", authenticateJWT, blockIfDisabled, async (req, res) => {
   const userId = req.user.id;
-  const { title, description, deadline, status, options = [] } = req.body;
+  const {
+    title,
+    description,
+    deadline,
+    status,
+    options = [],
+    authRequired,
+    allowSharedLinks,
+  } = req.body;
 
   if (status === "published" && options.length < 2) {
     return res.status(400).json({
@@ -156,6 +164,8 @@ router.post("/", authenticateJWT, blockIfDisabled, async (req, res) => {
       description,
       deadline,
       status,
+      authRequired,
+      allowSharedLinks,
       userId,
     });
     //[opttion1, option2, option3]
@@ -279,6 +289,7 @@ router.delete("/:id", authenticateJWT, async (req, res) => {
 
 //-------------------------------------------------------------- Create A vote ballot --------------------------------------------
 router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => {
+  console.log("Received vote POST from guest/user:", req.user?.id || "guest");
   // rankings = [
   //   { optionId: 1, rank: 1 },
   //   { optionId: 2, rank: 2 },
@@ -289,7 +300,7 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
 
   const { pollId } = req.params;
   // console.log("Poll Id", pollId)
-  const { rankings, submitted } = req.body;
+  const { rankings, submitted, email } = req.body;
 
 
   try {
@@ -300,10 +311,14 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
       include: { model: PollOption },
     });
 
-
-    // check if this poll exist
     if (!poll) {
       return res.status(404).json({ error: "Poll not found" });
+    }
+
+    //  Prevent guest voting if auth is required
+    if (poll.authRequired && !userId) {
+      console.log("Blocked guest from voting on a restricted poll");
+      return res.status(401).json({ error: "Authentication required to vote in this poll." });
     }
 
     ////  validation for poll ended status---------------------------------------
@@ -325,11 +340,13 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
 
     // Create a new vote
     const newVote = await Vote.create({
-      userId, // can be null
+      userId, // may be null
       pollId,
       submitted: submitted || false,
+      email, // store the voter's email
     });
 
+    console.log("Creating vote:", { userId, email, pollId });
 
 
     // I created the a new vote and linked it to the user and the poll now i need to create a new vote_ranking and link it to this vote
@@ -341,7 +358,7 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
     // create the rankings
     await VotingRank.bulkCreate(formattedRanks);
 
-
+    console.log("Submitting rankings:", formattedRanks);
 
     //increment participants
     if (newVote.submitted === true) {
@@ -391,7 +408,7 @@ router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => 
   }
 });
 
-//--------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------Edit Draft---------------------------------------------------------------
 router.patch("/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
   const userId = req.user.id;
   const { voteId, pollId } = req.params;
@@ -414,6 +431,13 @@ router.patch("/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
 
     // Update the vote (e.g., mark as submitted)
     await vote.update({ submitted });
+
+    if (!vote.submitted && submitted === true) {
+      const allVotes = await Vote.findAll({ where: { pollId, submitted: true } })
+      const poll = await Poll.findByPk(pollId);
+      poll.participants = allVotes.length;
+      poll.save
+    }
 
     // Replace rankings
     if (Array.isArray(rankings)) {

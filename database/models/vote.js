@@ -20,9 +20,12 @@ const Vote = db.define("vote", {
         type: DataTypes.INTEGER,
         // allowNull: false,
     },
-    guestEmail: {
+    email: {
         type: DataTypes.STRING,
-        unique: true,
+        allowNull: true, // guests and users can choose to leave it blank
+        validate: {
+            isEmail: true,
+        },
     },
     pollId: {
         type: DataTypes.INTEGER,
