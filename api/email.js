@@ -5,45 +5,46 @@ const { Vote, User } = require("../database");
 const { Op } = require("sequelize");
 
 router.post("/send-email/:pollId", async (req, res) => {
-    const { pollId } = req.params;
+  const { pollId } = req.params;
 
-    try{
-        // get voter emails
-        const voters = await Vote.findAll({
-            where: {
-              pollId,
-              [Op.or]: [
-                { userId: { [Op.ne]: null } },
-                { guestEmail: { [Op.ne]: null } },
-              ],
-            },
-            include: [
-              {
-                model: User,
-                attributes: ["email"],
-                required: false,
-              },
-            ],
-            attributes: ["userId", "guestEmail"],
-          });
+  try {
+    // get voter emails
+    const voters = await Vote.findAll({
+      where: {
+        pollId,
+        [Op.or]: [
+          { userId: { [Op.ne]: null } },
+          { email: { [Op.ne]: null } },
+        ],
+      },
+      include: [
+        {
+          model: User,
+          attributes: ["email"],
+          required: false,
+        },
+      ],
+      attributes: ["userId", "email"],
+    });
 
-        const voterEmails = voters
-        .map((vote) => vote.guestEmail || (vote.User ? vote.User.email : null))
-        .filter((email) => email !== null);
+    // console.log("Got all emails")
 
-        if (voterEmails.length === 0) {
-            return res.status(404).json({ error: "No voters found for this poll." });
-        }
+    const voterEmails = voters
+      .map((vote) => vote.email || (vote.User ? vote.User.email : null))
+      .filter((email) => email !== null);
 
-        // send email to each voter
-        const result = await sendMail(voterEmails);
+    // console.log("emails---->", voterEmails)
 
-        res.status(200).json({ message: "Email sent successfully", result });
-    }
-    catch (error) {
-        console.error("Error sending email:", error);
-        res.status(500).json({ error: "Failed to send email" });
-    }
+    // send email to each voter
+    const result = await sendMail(voterEmails);
+    // console.log("Email was sent maybe")
+
+    res.status(200).json({ message: "Email sent successfully", result });
+  }
+  catch (error) {
+    console.error("Error sending email:", error);
+    res.status(500).json({ error: "Failed to send email" });
+  }
 
 });
 
