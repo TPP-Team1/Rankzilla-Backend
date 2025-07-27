@@ -41,7 +41,7 @@ const Poll = db.define("poll", {
         unique: true,
         allowNull: false,
     },
-      
+
 },
     {
         timestamps: true,
@@ -52,36 +52,37 @@ const Poll = db.define("poll", {
 
 function slugify(text) {
     return text
-      .toString()
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-")
-      .replace(/[^\w\-]+/g, "")
-      .replace(/\-\-+/g, "-");
-  }
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w\-]+/g, "")
+        .replace(/\-\-+/g, "-");
+}
 
-  // generate a random string
-  function generateRandomString(length = 6) {
+// generate a random string
+function generateRandomString(length = 6) {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
     for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
     }
     return result;
-  }
-  
-  //auto-generate slug
-  Poll.beforeValidate(async (poll) => {
-    if (!poll.slug) {
+}
+
+//auto-generate slug
+Poll.beforeValidate(async (poll) => {
+    if (!poll.slug && poll.title) {  // <- this prevents slugify(undefined)
         const baseSlug = slugify(poll.title);
         let uniqueSlug = baseSlug;
 
-        while (await Poll.findOne({where: {slug: uniqueSlug}})){
+        while (await Poll.findOne({ where: { slug: uniqueSlug } })) {
             uniqueSlug = `${baseSlug}-${generateRandomString()}`;
         }
+
         poll.slug = uniqueSlug;
     }
-  })
+});
 
 
 

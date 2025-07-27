@@ -3,50 +3,61 @@ const router = express.Router();
 const { Poll, PollOption, Vote, VotingRank } = require("../database");
 const { authenticateJWT, blockIfDisabled, isAdmin, optionalAuth } = require("../auth");
 const { where, Model } = require("sequelize");
+const { Op } = require("sequelize"); // Op = Sequelize's operator tool (like AND, OR, NOT, etc.)
+
 
 // Get all users Polls----------------------------
 router.get("/", authenticateJWT, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const userPolls = await Poll.findAll({ where: { userId } });
+    // Get all votes submitted by this user
+    const userVotes = await Vote.findAll({ where: { userId } });
 
-    //polls user voted on
-    const votedPolls = await Poll.findAll({
-      include: {
-        model: Vote,
-        where: { userId },
-        attributes: [],
-      },
+    // Extract poll IDs that this user has voted in
+    const votedPollIds = [...new Set(userVotes.map(vote => vote.pollId))];
+    console.log("User voted in poll IDs:", votedPollIds);
+
+    // Get all polls created by this user
+    const createdPolls = await Poll.findAll({
+      where: { userId },
+      include: [{ model: PollOption }], // optional, fetches options if needed
     });
 
-    // Combine both results
-    const pollMap = new Map();
+    // Get all polls the user voted in, but DIDN'T create
+    const votedPolls = votedPollIds.length > 0
+      ? await Poll.findAll({
+        where: {
+          id: votedPollIds,              // poll ID is in the user's vote list
+          userId: { [Op.ne]: userId },   // but NOT created by this user (Op.ne = "not equal")
+        },
+        include: [{ model: PollOption }],
+      })
+      : []; // fallback in case user has no votes
 
-    userPolls.forEach(poll => {
-      pollMap.set(poll.id, {
-        ...poll.toJSON(),
-        ownerId: userId,
-        participated: false,
-      });
-    });
+    console.log("Created polls:", createdPolls.length);
+    console.log("Voted (not owned) polls:", votedPolls.length);
 
-    votedPolls.forEach(poll => {
-      if (!pollMap.has(poll.id)) {
-        pollMap.set(poll.id, {
-          ...poll.toJSON(),
-          ownerId: poll.userId,
-          participated: true,
-        });
-      }
-    });
+    //Format results to mark `created` or `participated` for frontend filters
+    const formattedCreated = createdPolls.map(poll => ({
+      ...poll.toJSON(),
+      created: true,
+      participated: false,
+    }));
 
-    // Convert map back to array
-    const allPolls = Array.from(pollMap.values());
+    const formattedVoted = votedPolls.map(poll => ({
+      ...poll.toJSON(),
+      created: false,
+      participated: true,
+    }));
+
+    //Combine both into one clean array
+    const allPolls = [...formattedCreated, ...formattedVoted];
 
     res.json(allPolls);
   } catch (error) {
-    res.status(500).json({ error: "Failed to get all polls" });
+    console.error("Error in GET /api/polls:", error);
+    res.status(500).json({ error: "Failed to fetch polls" });
   }
 });
 
@@ -287,193 +298,89 @@ router.delete("/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-//-------------------------------------------------------------- Create A vote ballot --------------------------------------------
+// --------------------- Create Vote (Draft Only) ---------------------
 router.post("/:pollId/vote", optionalAuth, blockIfDisabled, async (req, res) => {
-  console.log("Received vote POST from guest/user:", req.user?.id || "guest");
-  // rankings = [
-  //   { optionId: 1, rank: 1 },
-  //   { optionId: 2, rank: 2 },
-  // ];
-  // console.log("Vote route hit");
-  const userId = req.user?.id || null; // null = guest  
-  console.log("req.user:", req.user);
-
   const { pollId } = req.params;
-  // console.log("Poll Id", pollId)
-  const { rankings, submitted, email } = req.body;
-
+  const { email } = req.body;
+  const userId = req.user?.id || null;
 
   try {
-
-    // I know I am going to need the options that belong to this poll so I should query this poll and include the options
-    const poll = await Poll.findOne({
-      where: { id: pollId },
-      include: { model: PollOption },
-    });
-
-    if (!poll) {
-      return res.status(404).json({ error: "Poll not found" });
-    }
-
-    //  Prevent guest voting if auth is required
-    if (poll.authRequired && !userId) {
-      console.log("Blocked guest from voting on a restricted poll");
-      return res.status(401).json({ error: "Authentication required to vote in this poll." });
-    }
-
-    ////  validation for poll ended status---------------------------------------
-    /////     here
-
-
-
-    // I want to create a new vote only if a vote does not already exist
-    // Check if user already voted (only for logged-in users)
+    // Block duplicate votes for authenticated users
     if (userId) {
-      const existingVote = await Vote.findOne({
-        where: { userId, pollId }
-      });
+      const existingVote = await Vote.findOne({ where: { pollId, userId } });
       if (existingVote) {
-        return res.status(401).json({ error: "You already voted" });
+        return res.status(409).json({ error: "Vote already exists" });
       }
     }
 
+    // Validate email for guests
+    if (!userId && (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+      return res.status(400).json({ error: "Valid email is required for guests" });
+    }
 
-    // Create a new vote
-    const newVote = await Vote.create({
-      userId, // may be null
+    // Create a draft vote
+    const vote = await Vote.create({
+      userId,
       pollId,
-      submitted: submitted || false,
-      email, // store the voter's email
+      email: userId ? null : email,
+      submitted: false,
     });
 
-    console.log("Creating vote:", { userId, email, pollId });
-
-
-    // I created the a new vote and linked it to the user and the poll now i need to create a new vote_ranking and link it to this vote
-    const formattedRanks = rankings.map(r => ({
-      pollOptionId: r.optionId,
-      voteId: newVote.id,
-      rank: r.rank,
-    }));
-    // create the rankings
-    await VotingRank.bulkCreate(formattedRanks);
-
-    console.log("Submitting rankings:", formattedRanks);
-
-    //increment participants
-    if (newVote.submitted === true) {
-      const allVotes = await Vote.findAll({ where: { pollId: pollId } })
-      poll.participants = allVotes.length
-      await poll.save();
-    }
-
-
-    // const newVoteRanking = await VotingRank.bulkCreate(formattedVotingRank)
-    // return res.send(newVoteRanking)
-
-    const completedVote = await Vote.findOne({
-      where: { id: newVote.id },
-      include: {
-        model: VotingRank,
-        include: {
-          model: PollOption,
-          attributes: ['id', 'optionText', 'position'],
-        },
-      },
-    });
-    // console.log(completedVote.votingRanks)
-    for (const votingRank of completedVote.votingRanks) {
-      votingRank.pollOption.position = votingRank.rank - 1;
-    }
-    return res.send(completedVote);
-
-    // Recap I have the target Poll then I featch the vote that belongs to the user and this poll .. after getting the vote
-    // i was able to fetech all rankings that belongs to this vote
-
-    // I now know that i am able to fetch all the data the I need .. however I am fetchin a vote that already exist but has not been submitted
-    // if (vote.submitted === true) {
-    //   return res.status(401).json({
-    //     error: "this user has already submitted a  vote for this poll",
-    //   });
-    // }
-
-
-    // return res.send(vote);
-
-    /// so from here i have succesfully submitted a vote now i need to go back to the top and create a new vote with new rankings since
-    // what I accomplish was to submit a vote predefined in the seed.js
-  } catch (error) {
-    console.error("Guest vote error:", error);
-    res.status(500).json({ error: "Failed to submit vote" });
+    return res.status(201).json(vote);
+  } catch (err) {
+    console.error("Vote creation error:", err);
+    return res.status(500).json({ error: "Failed to create vote" });
   }
 });
 
-//--------------------------------------------------------------------------------Edit Draft---------------------------------------------------------------
-router.patch("/:pollId/vote/:voteId", authenticateJWT, async (req, res) => {
-  const userId = req.user.id;
-  const { voteId, pollId } = req.params;
-  const { submitted, rankings } = req.body;
-
-
+// --------------------- Submit or Save Draft Vote ---------------------
+router.patch("/:pollId/vote/:voteId", optionalAuth, async (req, res) => {
+  const { pollId, voteId } = req.params;
+  const { rankings, submitted } = req.body;
+  const userId = req.user?.id || null;
 
   try {
+    // Look up the vote — must match pollId and either belong to logged-in user or be anonymous
     const vote = await Vote.findOne({
-      where: { id: voteId, pollId, userId },
-      include: VotingRank,
+      where: {
+        id: voteId,
+        pollId,
+        [Op.or]: [{ userId }, { userId: null }],
+      },
     });
 
-    if (!vote) {
-      return res.status(404).json({ error: "Vote not found" });
-    }
-    if (vote.submitted) {
-      return res.status(403).json({ error: "Cannot update a submitted vote" });
-    }
+    if (!vote) return res.status(404).json({ error: "Vote not found" });
+    if (vote.submitted) return res.status(403).json({ error: "Vote already submitted" });
 
-    // Update the vote (e.g., mark as submitted)
-    await vote.update({ submitted });
-
-    if (!vote.submitted && submitted === true) {
-      const allVotes = await Vote.findAll({ where: { pollId, submitted: true } })
-      const poll = await Poll.findByPk(pollId);
-      poll.participants = allVotes.length;
-      poll.save
-    }
-
-    // Replace rankings
+    // Update rankings if provided
     if (Array.isArray(rankings)) {
-      // 🧹 Delete old rankings
       await VotingRank.destroy({ where: { voteId } });
 
-      //Create new rankings
-      const newRanks = rankings.map(rank => ({
+      const newRanks = rankings.map((r) => ({
         voteId,
-        pollOptionId: rank.optionId,
-        rank: rank.rank,
+        pollOptionId: r.optionId,
+        rank: r.rank,
       }));
       await VotingRank.bulkCreate(newRanks);
     }
 
-    // Re-fetch updated vote and send back
-    const updatedVote = await Vote.findOne({
-      where: { id: voteId },
-      include: {
-        model: VotingRank,
-        include: {
-          model: PollOption,
-          attributes: ['id', 'optionText', 'position'],
-        },
-      },
-    });
+    // If submitted, finalize the vote
+    if (submitted === true) {
+      await vote.update({ submitted: true });
 
-    // positions for frontend display
-    for (const votingRank of updatedVote.votingRanks) {
-      votingRank.pollOption.position = votingRank.rank - 1;
+      // Recount participants
+      const count = await Vote.count({
+        where: { pollId, submitted: true },
+      });
+      await Poll.update({ participants: count }, { where: { id: pollId } });
+
+      return res.status(200).json({ message: "Vote submitted" });
     }
 
-    return res.json(updatedVote);
-
-  } catch (error) {
-    console.error("Failed to update vote:", error);
+    // Otherwise, just saved as draft (only for logged-in users)
+    return res.status(200).json({ message: "Draft saved" });
+  } catch (err) {
+    console.error("Vote update error:", err);
     return res.status(500).json({ error: "Failed to update vote" });
   }
 });
