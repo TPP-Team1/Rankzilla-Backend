@@ -5,6 +5,7 @@ const { Vote, User } = require("../database");
 const { Op } = require("sequelize");
 
 router.post("/send-email/:pollId", async (req, res) => {
+
     const { pollId } = req.params;
 
     try{

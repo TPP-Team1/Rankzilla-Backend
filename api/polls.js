@@ -259,7 +259,7 @@ router.patch("/:pollId", authenticateJWT, async (req, res) => {
     }
 
     if (updatePoll.status === "published") {
-      const updateDeadline = await updatePoll.update({ deadline });
+      const updateDeadline = await updatePoll.update({ deadline, status });
       return res.json(updateDeadline);
     }
     return res
@@ -423,8 +423,6 @@ router.get("/:pollId/vote", authenticateJWT, async (req, res) => {
 
 router.get("/:pollId/results", blockIfDisabled, async (req, res) => {
 
-
-  //const userId = req.user.id;
   const { pollId } = req.params;
 
   const votes = await Vote.findAll({
