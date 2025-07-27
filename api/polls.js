@@ -265,6 +265,12 @@ router.patch("/:pollId", authenticateJWT, async (req, res) => {
     return res
       .status(400)
       .json({ error: "Invalid poll status string or update not allowed" });
+
+    ///email
+    
+
+
+
   } catch (error) {
     console.error("Update error:", error);
     res.status(500).json({
@@ -415,10 +421,10 @@ router.get("/:pollId/vote", authenticateJWT, async (req, res) => {
 
 //------------------------------------ Calculate results -------------------------------------------------------- 
 
-router.get("/:pollId/results", authenticateJWT, blockIfDisabled, async (req, res) => {
+router.get("/:pollId/results", blockIfDisabled, async (req, res) => {
 
 
-  const userId = req.user.id;
+  //const userId = req.user.id;
   const { pollId } = req.params;
 
   const votes = await Vote.findAll({
