@@ -410,6 +410,9 @@ router.get("/:pollId/vote", authenticateJWT, async (req, res) => {
   }
 });
 
+
+
+
 //------------------------------------ Calculate results -------------------------------------------------------- 
 
 router.get("/:pollId/results", authenticateJWT, blockIfDisabled, async (req, res) => {
